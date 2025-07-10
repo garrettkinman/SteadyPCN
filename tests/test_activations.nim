@@ -4,7 +4,7 @@
 # https://opensource.org/licenses/MIT
 
 import unittest
-import tinyNN
+import steadynn
 
 var
     a = Tensor.new([2, 3], @[float32 -3, -2, -1, 1, 2, 3])

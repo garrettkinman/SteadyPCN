@@ -4,8 +4,11 @@
 # https://opensource.org/licenses/MIT
 
 import std / [math, sequtils, random]
+import tensors / [tensors, sparsetensors]
 
 type
+    AbstractTensor*[T] = ref object of RootObj
+    
     Tensor*[T] = ref TensorObj[T]
     TensorObj[T] = object
         shape*: seq[int]

@@ -5,7 +5,9 @@
 
 import sugar
 import ../tensors
+import activations
 
+# TODO: change the constructors to specify input and output size; determine matrix shape from there
 type
     Dense*[T] = object
         # TODO: make these statically allocated on the stack for performance + memory safety
@@ -13,7 +15,13 @@ type
         bias*: Tensor[T]
         activation*: (Tensor[T]) -> Tensor[T]
 
-# TODO: fix this to work and look nice
+proc newDense*[T](inputSize: int, outputSize: int, slice: HSlice[T, T], activation: (Tensor[T]) -> Tensor[T]): Dense[T] =
+    result = Dense[T](
+        weights: Tensor[T].rand([outputSize, inputSize], slice),
+        bias: Tensor[T].rand([outputSize, 1], slice),
+        activation: activation
+    )
+
 proc newDense*[T](shape: openArray[int], slice: HSlice[T, T], activation: (Tensor[T]) -> Tensor[T]): Dense[T] =
     result = Dense[T](
         weights: Tensor[T].rand(shape, slice),
@@ -21,7 +29,6 @@ proc newDense*[T](shape: openArray[int], slice: HSlice[T, T], activation: (Tenso
         activation: activation
     )
 
-# TODO: fix this to work and look nice
 proc newDense*[T](weights: Tensor[T], bias: Tensor[T], activation: (Tensor[T]) -> Tensor[T]): Dense[T] =
     result = Dense[T](
         weights: weights,
@@ -29,7 +36,6 @@ proc newDense*[T](weights: Tensor[T], bias: Tensor[T], activation: (Tensor[T]) -
         activation: activation
     )
 
-# TODO: fix this to work and look nice
 proc newDense*[T](shape: openArray[int], weights: seq[T], bias: seq[T], activation: (Tensor[T]) -> Tensor[T]): Dense[T] =
     result = Dense[T](
         weights: Tensor[T].new(shape, weights),

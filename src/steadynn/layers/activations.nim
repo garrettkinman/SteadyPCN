@@ -36,3 +36,6 @@ proc relu*[T](tensor: Tensor[T]): Tensor[T] =
         let x: T = tensor.data[it]
         let y: T = relu(x)
         result.data[it] = y
+
+proc identity*[T](tensor: Tensor[T]): Tensor[T] {.inline.} =
+    result = tensor
