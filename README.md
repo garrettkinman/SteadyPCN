@@ -6,44 +6,13 @@
 -->
 
 # tinyNN
-Lightweight, performant, and dependency-free neural network inference engine for TinyML written in pure Nim. Portable to custom accelerators and WASM.
+A lightweight, flexible, dependency-free neural network framework that uses zero dynamic memory allocation. Intended for microcontrollers.
 
-# Planned Features
-- Data types
-  - `int8`
-  - `float32`
-  - More? (TBD)
-- Tensor types
-  - Regular (dynamically allocated)
-  - Sparse
-  - Statically allocated? (TBD)
-- Standard layers
-  - Dense
-  - Conv, DepthwiseConv
-  - Pooling layers
-  - Output layers, e.g., softmax
-  - Recurrent layers? (TBD)
-  - Attention layers? (TBD)
-  - More? (TBD)
-- Standard activation functions
-  - sigmoid
-  - relu
-  - tanh
-  - More? (TBD)
-- Statically-allocated model parameters
-  - Maybe have the entire library itself have no dynamic allocations?
-- Optimized CPU operations (so no BLAS dependencies)
-- Built-in hardware acceleration support
-  - RISC-V V extension (vector)
-  - RISC-V P extension (packed SIMD)
-  - More? (TBD)
-- Ability to (relatively) easily accelerate on other hardware
-  - Expose layers as some combination of tensor operations so that accelerating becomes a matter of accelerating the tensor operations
-  - Treat activation functions as tensor operations so that they, too, can be accelerated
-- Ability to easily port to WASM
-- Ability to load pre-trained parameters from a standard `.tflite` file
-- On-device learning? (TBD)
-- Forward-only learning? (TBD)
-  - Forward-Forward
-  - PEPITA
-  - MEMPITA
+# Concept
+This framework is built atop [SteadyTensor](https://github.com/garrettkinman/SteadyTensor), and is built around a few key principles:
+1. **No dynamic memory allocation.** This is to improve performance and to provide compile-time guarantees of memory usage. For many safety-critical applications, this is also considered a requirement / best practice.
+2. **Configurable memory format.** Tensors can be configured to be stored in either row-major or column-major order at compile time (just pass `-d:colMajor` to the compiler for column-major, else it defaults to row-major), allowing optimization depending on the hardware available to you.
+3. **Configurable data types.** Tensors can easily be configured to use any underlying data type, even custom ones. This aids in rapid prototyping of various low-bit architectures.
+4. **Portable to new hardware.** Porting to new hardware (including dedicated accelerators) is as easy as implementing the kernels on the hardware.
+5. **No dependencies.** Working with other TinyML frameworks can be a pain, as there are so many dependencies that can (and often do) give you problems. By avoiding dependencies, this framework is much easier to use, simpler to understand and debug, and less of a pain to set up and use.
+
