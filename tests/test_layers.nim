@@ -4,7 +4,7 @@
 # https://opensource.org/licenses/MIT
 
 import unittest
-import tinyNN
+import steadynn
 
 let
     a = Dense[float32].new([2, 3], (1.float32)..(1.float32), relu)

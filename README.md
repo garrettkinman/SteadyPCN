@@ -5,8 +5,7 @@
  https://opensource.org/licenses/MIT
 -->
 
-# tinyNN
-A lightweight, flexible, dependency-free neural network framework that uses zero dynamic memory allocation. Intended for microcontrollers.
+An ultra-light, ultra-flexible neural network framework written in pure Nim. Intended for microcontrollers.
 
 # Concept
 This framework is built atop [SteadyTensor](https://github.com/garrettkinman/SteadyTensor), and is built around a few key principles:

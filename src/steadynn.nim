@@ -3,6 +3,6 @@
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
 
-import tinyNN / [tensors, model]
-import tinyNN / layers / [activations, dense, softmax]
+import steadynn / [tensors, model]
+import steadynn / layers / [activations, dense, softmax]
 export tensors, model, activations, dense, softmax

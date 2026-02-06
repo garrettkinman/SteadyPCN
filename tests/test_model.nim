@@ -4,7 +4,7 @@
 # https://opensource.org/licenses/MIT
 
 import unittest
-import tinyNN
+import steadynn
 
 type
     SingleLayerPerceptronModel[T] = object
