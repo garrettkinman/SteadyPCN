@@ -5,7 +5,7 @@
  https://opensource.org/licenses/MIT
 -->
 
-An ultra-light, ultra-flexible neural network framework written in pure Nim. Intended for microcontrollers.
+An ultra-light, ultra-flexible predictive coding framework written in pure Nim. Intended for microcontrollers.
 
 # Concept
 This framework is built atop [SteadyTensor](https://github.com/garrettkinman/SteadyTensor), and is built around a few key principles:

@@ -7,7 +7,7 @@
 
 version       = "0.1.0"
 author        = "Garrett Kinman"
-description   = "An ultra-light, ultra-flexible neural network framework written in pure Nim. Intended for microcontrollers."
+description   = "An ultra-light, ultra-flexible predictive coding framework written in pure Nim. Intended for microcontrollers."
 license       = "MIT"
 srcDir        = "src"
 
