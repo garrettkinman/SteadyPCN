@@ -28,7 +28,7 @@ type
 # INITIALIZATION
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-proc initPcnLayer*[M, N: static int; T; act: Activation[T]](lr: T = 0.01, infRate: T = 0.1): PcnDenseLayer[M, N, T, Act] =
+proc initPcnLayer*[M, N: static int; T; act: Activation[T]](lr: T = 0.01, infRate: T = 0.1): PcnDenseLayer[M, N, T, act] =
     result.weights       = rand[T, [M, N]](-0.1, 0.1)
     result.bias          = zeros[T, [M, 1]]()
     result.state         = zeros[T, [N, 1]]()

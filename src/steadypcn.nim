@@ -3,5 +3,5 @@
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
 
-import steadypcn / [activations]
-export activations
+import steadypcn / [activations, pcn]
+export activations, pcn
