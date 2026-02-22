@@ -101,3 +101,132 @@ suite "Identity":
     test "grad: always 1":
         for x in [-100.0, -1.0, 0.0, 1.0, 100.0]:
             check id.grad(x) == 1.0
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Vectorized overloads
+# Each suite verifies:
+#   1. Output length matches input length.
+#   2. Each element matches the corresponding scalar overload.
+#   3. Any activation-specific property that is meaningful at the vector level.
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+suite "Sigmoid – vectorized":
+    let s = Sigmoid()
+    let v = initVector[float, 5]([-2.0, -1.0, 0.0, 1.0, 2.0])
+
+    test "activate: output length matches input":
+        check s.activate(v).len == v.len
+
+    test "activate: each element matches scalar overload":
+        let r = s.activate(v)
+        for i in 0 ..< v.len:
+            check abs(r[i] - s.activate(v[i])) < eps
+
+    test "activate: all outputs bounded in (0, 1)":
+        let r = s.activate(v)
+        for i in 0 ..< r.len:
+            check r[i] > 0.0 and r[i] < 1.0
+
+    test "grad: output length matches input":
+        check s.grad(v).len == v.len
+
+    test "grad: each element matches scalar overload":
+        let r = s.grad(v)
+        for i in 0 ..< v.len:
+            check abs(r[i] - s.grad(v[i])) < eps
+
+    test "grad: all outputs positive":
+        let r = s.grad(v)
+        for i in 0 ..< r.len:
+            check r[i] > 0.0
+
+suite "Tanh – vectorized":
+    let t = Tanh()
+    let v = initVector[float, 5]([-2.0, -1.0, 0.0, 1.0, 2.0])
+
+    test "activate: output length matches input":
+        check t.activate(v).len == v.len
+
+    test "activate: each element matches scalar overload":
+        let r = t.activate(v)
+        for i in 0 ..< v.len:
+            check abs(r[i] - t.activate(v[i])) < eps
+
+    test "activate: odd function holds element-wise":
+        # activate(-v) should equal -activate(v) for each element
+        let vNeg = initVector[float, 4]([-2.0, -1.0, 1.0, 2.0])
+        let vPos = initVector[float, 4]([ 2.0,  1.0,-1.0,-2.0])
+        let rNeg = t.activate(vNeg)
+        let rPos = t.activate(vPos)
+        for i in 0 ..< rNeg.len:
+            check abs(rNeg[i] + rPos[i]) < eps
+
+    test "grad: output length matches input":
+        check t.grad(v).len == v.len
+
+    test "grad: each element matches scalar overload":
+        let r = t.grad(v)
+        for i in 0 ..< v.len:
+            check abs(r[i] - t.grad(v[i])) < eps
+
+    test "grad: all outputs positive":
+        let r = t.grad(v)
+        for i in 0 ..< r.len:
+            check r[i] > 0.0
+
+suite "ReLU – vectorized":
+    let r = ReLU()
+    let v = initVector[float, 6]([-3.0, -1.0, 0.0, 0.0, 1.0, 3.0])
+
+    test "activate: output length matches input":
+        check r.activate(v).len == v.len
+
+    test "activate: each element matches scalar overload":
+        let res = r.activate(v)
+        for i in 0 ..< v.len:
+            check res[i] == r.activate(v[i])
+
+    test "activate: negative inputs produce zero":
+        let res = r.activate(v)
+        check res[0] == 0.0
+        check res[1] == 0.0
+
+    test "activate: positive inputs pass through":
+        let res = r.activate(v)
+        check res[4] == 1.0
+        check res[5] == 3.0
+
+    test "grad: output length matches input":
+        check r.grad(v).len == v.len
+
+    test "grad: each element matches scalar overload":
+        let res = r.grad(v)
+        for i in 0 ..< v.len:
+            check res[i] == r.grad(v[i])
+
+    test "grad: 0 for negative, 1 for positive":
+        let res = r.grad(v)
+        check res[0] == 0.0   # -3
+        check res[1] == 0.0   # -1
+        check res[4] == 1.0   #  1
+        check res[5] == 1.0   #  3
+
+suite "Identity – vectorized":
+    let id = Identity()
+    let v  = initVector[float, 4]([-5.0, 0.0, 1.0, 42.0])
+
+    test "activate: output length matches input":
+        check id.activate(v).len == v.len
+
+    test "activate: returns vector unchanged":
+        let res = id.activate(v)
+        for i in 0 ..< v.len:
+            check res[i] == v[i]
+
+    test "grad: output length matches input":
+        check id.grad(v).len == v.len
+
+    test "grad: all elements are 1":
+        let res = id.grad(v)
+        for i in 0 ..< res.len:
+            check res[i] == 1.0
