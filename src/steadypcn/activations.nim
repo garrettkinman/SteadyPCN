@@ -5,6 +5,7 @@
 
 # src/steadypcn/activations.nim
 import math
+import tensors
 
 type
     Activation*[T] = concept a
@@ -67,3 +68,34 @@ func activate*[T](_: Identity, x: T): T {.inline.} =
 
 func grad*[T](_: Identity, x: T): T {.inline.} =
     1.T
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# VECTORIZED OVERLOADS
+# One explicit overload per activation type so that overload resolution is
+# unambiguous — the scalar overloads would otherwise match Vector arguments
+# by unifying T = Vector[...], winning on the more-specific first argument.
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+func activate*[T; N: static int](_: Sigmoid, v: Vector[T, N]): Vector[T, N] {.inline.} =
+    for i in 0 ..< N: result.data[i] = activate(Sigmoid(), v.data[i])
+
+func grad*[T; N: static int](_: Sigmoid, v: Vector[T, N]): Vector[T, N] {.inline.} =
+    for i in 0 ..< N: result.data[i] = grad(Sigmoid(), v.data[i])
+
+func activate*[T; N: static int](_: Tanh, v: Vector[T, N]): Vector[T, N] {.inline.} =
+    for i in 0 ..< N: result.data[i] = activate(Tanh(), v.data[i])
+
+func grad*[T; N: static int](_: Tanh, v: Vector[T, N]): Vector[T, N] {.inline.} =
+    for i in 0 ..< N: result.data[i] = grad(Tanh(), v.data[i])
+
+func activate*[T; N: static int](_: ReLU, v: Vector[T, N]): Vector[T, N] {.inline.} =
+    for i in 0 ..< N: result.data[i] = activate(ReLU(), v.data[i])
+
+func grad*[T; N: static int](_: ReLU, v: Vector[T, N]): Vector[T, N] {.inline.} =
+    for i in 0 ..< N: result.data[i] = grad(ReLU(), v.data[i])
+
+func activate*[T; N: static int](_: Identity, v: Vector[T, N]): Vector[T, N] {.inline.} =
+    v   # element-wise identity is the vector itself
+
+func grad*[T; N: static int](_: Identity, v: Vector[T, N]): Vector[T, N] {.inline.} =
+    ones(Vector[T, N])
