@@ -95,7 +95,8 @@ suite "PcnDenseLayer – predict()  (Identity activation)":
     test "drive buffer is updated after predict()":
         var layer: PcnDenseLayer[2, 2, float, Identity]
         layer.init(Identity())
-        layer.weights[0, 0] = 1.0; layer.weights[1, 1] = 1.0
+        layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
+        layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0
         layer.state[0] = 4.0;   layer.state[1] = -2.0
         discard layer.predict()
         check approxEq(layer.drive[0],  4.0, eps)
@@ -124,9 +125,9 @@ suite "PcnDenseLayer – predict()  (non-linear activations)":
         layer.state[1] = -100.0 # should saturate near 0
         layer.state[2] = 0.0    # should be near 0.5
         # Use identity weights so drive = state
-        layer.weights[0, 0] = 1.0
-        layer.weights[1, 1] = 1.0
-        layer.weights[2, 2] = 1.0
+        layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0; layer.weights[0, 2] = 0.0
+        layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0; layer.weights[1, 2] = 0.0
+        layer.weights[2, 0] = 0.0; layer.weights[2, 1] = 0.0; layer.weights[2, 2] = 1.0
         let pred = layer.predict()
         check pred[0] > 0.999
         check pred[1] < 0.001
@@ -135,7 +136,8 @@ suite "PcnDenseLayer – predict()  (non-linear activations)":
     test "ReLU: negative drive produces zero output":
         var layer: PcnDenseLayer[2, 2, float, ReLU]
         layer.init(ReLU())
-        layer.weights[0, 0] = 1.0; layer.weights[1, 1] = 1.0
+        layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
+        layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0
         layer.state[0] =  2.0
         layer.state[1] = -3.0
         let pred = layer.predict()
@@ -238,8 +240,8 @@ suite "PcnDenseLayer – relax()  (Identity activation)":
         # Use identity weight matrix so W^T * errorBelow = errorBelow
         var layer: PcnDenseLayer[2, 2, float, Identity]
         layer.init(Identity(), infRate = 1.0)
-        layer.weights[0, 0] = 1.0; layer.weights[1, 1] = 1.0
-        # state = [0, 0], error = [0, 0]  (default)
+        layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
+        layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0
         # errorBelow = [2, 0]
         # delta = W^T * [2, 0] - error = [2, 0] - [0, 0] = [2, 0]
         # new state = [0, 0] + 1.0 * [2, 0] = [2, 0]
@@ -389,6 +391,11 @@ suite "PcnDenseLayer – End-to-end convergence":
 
         let target = initVector[float, 2]([2.0, 3.0])
 
+        # Record error from the very first prediction (initial weights)
+        let initPred = layer.predict()
+        let firstErr = abs(target[0] - initPred[0]) +
+                       abs(target[1] - initPred[1])
+
         var prevError = float.high
         for _ in 0..49:
             let pred = layer.predict()
@@ -403,9 +410,4 @@ suite "PcnDenseLayer – End-to-end convergence":
         let finalErr = abs(target[0] - finalPred[0]) +
                        abs(target[1] - finalPred[1])
         # Error after 50 steps should be smaller than the very first error
-        let firstPred = initVector[float, 2](
-            [layer.weights[0,0]*1.0 + layer.weights[0,1]*1.0,
-             layer.weights[1,0]*1.0 + layer.weights[1,1]*1.0])
-        let firstErr = abs(target[0] - firstPred[0]) +
-                       abs(target[1] - firstPred[1])
         check finalErr < firstErr
