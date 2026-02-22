@@ -7,7 +7,7 @@
 import math
 
 type
-    ActivationFunction*[T] = concept a
+    Activation*[T] = concept a
         activate(a, T) is T
         grad(a, T) is T
 

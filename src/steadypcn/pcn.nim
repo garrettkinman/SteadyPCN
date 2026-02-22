@@ -9,100 +9,104 @@ import activations
 
 type
     # A Dense Predictive Coding Layer
-    # Inputs: M, Outputs: N
-    PcnDenseLayer*[M, N: static int; T] = object
+    # Explanations: N, Observations: M
+    PcnDenseLayer*[M, N: static int; T; act: Activation[T]] = object
         # Parameters
-        weights*: Tensor[T, [M, N]]
-        bias*: Tensor[T, [N, 1]]
-        
-        # State Buffers (Preserved between steps)
-        state*: Tensor[T, [N, 1]]      # x: The current belief/activity
-        prediction*: Tensor[T, [N, 1]] # mu: The prediction coming from bottom-up
-        error*: Tensor[T, [N, 1]]      # e: The difference (state - prediction)
-        
+        weights*: Tensor[T, [M, N]]  # Maps this layer's state [N,1] to prediction [M,1]
+        bias*:    Tensor[T, [M, 1]]  # Added to pre-activation; shape matches prediction, not state
+
+        # State buffers (preserved between steps)
+        state*: Tensor[T, [N, 1]]    # state = current belief / representation
+        drive*: Tensor[T, [M, 1]]    # drive = W * state + bias
+        error*: Tensor[T, [N, 1]]    # error = state - prediction received from above
+
         # Configuration
-        learningRate*: T
-        inferenceRate*: T # For relaxing the state during inference
-        # TODO: activation function
+        learningRate*:  T
+        inferenceRate*: T
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # INITIALIZATION
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-proc initPcnLayer*[N, M: static int; T](lr: T = 0.01, infRate: T = 0.1): PcnDenseLayer[N, M, T] =
-    result.weights = rand[T, [M, N]](-0.1, 0.1) # Initialize small random weights
-    result.bias = zeros[T, [N, 1]]()
-    result.state = zeros[T, [N, 1]]()
-    result.prediction = zeros[T, [N, 1]]()
-    result.error = zeros[T, [N, 1]]()
-    result.learningRate = lr
+proc initPcnLayer*[M, N: static int; T; act: Activation[T]](lr: T = 0.01, infRate: T = 0.1): PcnDenseLayer[M, N, T, Act] =
+    result.weights       = rand[T, [M, N]](-0.1, 0.1)
+    result.bias          = zeros[T, [M, 1]]()
+    result.state         = zeros[T, [N, 1]]()
+    result.drive         = zeros[T, [M, 1]]()
+    result.error         = zeros[T, [N, 1]]()
+    result.learningRate  = lr
     result.inferenceRate = infRate
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# GENERATE PREDICTION
+# STEP 1 — PREDICT
+# Downward pass: generate this layer's prediction of what the layer below
+# should look like.  Pure (no mutation); caller forwards the result to the
+# layer below's updateError.
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-func predict*[M, N: static int; T](layer: lent PcnDenseLayer[M, N, T]): Tensor[T, [M, 1]] =
-    ## 1. Generates prediction: mu = f(Wx + b)
-    ## 2. Calculates error: e = x - mu
-    
-    # Linear transform: (W * r) + b
-    var preAct = (layer.weights * layer.state) + layer.biases
-    
-    # Apply Non-linearity (Sigmoid example)
-    result = map(preAct, sigmoid) # TODO: handle activation functions better
-    
-    # # Calculate Local Prediction Error: e = state - prediction
-    # layer.error = layer.state - layer.prediction
+proc predict*[M, N: static int; T; act: Activation[T]](layer: lent PcnDenseLayer[M, N, T, act]): Tensor[T, [M, 1]] =
+    ## pred = act.activate(W * state + bias)
+    ## Returns [M, 1] — the prediction sent downward.
+    ##
+    ## act.activate() is zero-cost; the lambda below is a compile-time shim that lets
+    ## map() accept the concept's forward proc without allocating a closure.
+    layer.drive = (layer.weights * layer.state) + layer.bias
+    result = map(
+        layer.drive,
+        func(x: T): T = act.activate(x)
+    )
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# STATE UPDATE
+# STEP 2 — UPDATE ERROR
+# Store the top-down prediction received from above and compute local error.
+# Call after the layer above has called predict().
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-func relax*[N, M, K: static int; T](
-    layer: var PcnDenseLayer[N, M, T], 
-    nextLayerError: Tensor[T, [K, 1]], 
-    nextLayerWeights: Tensor[T, [K, N]]
-) =
-    ## Updates the layer's state (x) to minimize local and downstream errors.
-    ## formula: dx = -local_error + (NextWeights.T * next_error) * f'(x)
-    
-    # 1. Top-Down Error Projection (Feedback)
-    # We use matmulT to virtually transpose weights 
-    # Result shape is [N, 1]
-    let feedbackError = matmulT(nextLayerWeights, nextLayerError)
-    
-    # 2. Calculate Derivative of state (assuming Sigmoid)
-    let dState = map(layer.state, sigmoidDerivative)
-    
-    # 3. Compute Total Gradient
-    # We want to minimize Free Energy. 
-    # Gradient descent on State: x += rate * (-error + feedback)
-    # Note: This is a simplified F.E. update common in approximations.
-    
-    var delta = (feedbackError .* dState) - layer.error
-    
-    # 4. Apply Update
+proc updateError*[M, N: static int; T; act: Activation[T]](layer: var PcnDenseLayer[M, N, T, act], predFromAbove: lent Tensor[T, [N, 1]]) =
+    ## e = state - pred_from_above
+    ## Mutates layer.error in-place — no allocation.
+    # for i in 0..<N:
+    #     layer.error[i, 0] = layer.state[i, 0] - predFromAbove[i, 0]
+    layer.error = layer.state - predFromAbove # TODO: update to in-place version when available
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# STEP 3 — RELAX (state update / inference)
+# Update this layer's state to reduce both its own error and the errors
+# it causes in the layer below.
+# Assumes updateError has already been called this step.
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+proc relax*[M, N: static int; T; act: Activation[T]](layer: var PcnDenseLayer[M, N, T, act], errorBelow: lent Tensor[T, [M, 1]]) =
+    ## dx = inferenceRate * ((W^T * errorBelow) .* act.grad(layer.drive) - layer.error)
+    ##
+    ## Two small stack tensors are allocated (feedback [N,1], dState [N,1]);
+    ## the update is then applied directly into layer.state — no delta tensor.
+
+    # Derivative of the activation at the current drive.
+    # Result: [M, 1]
+    let dDrive = map(layer.drive, func(x: T): T = act.grad(x))
+
+    # Back-project the error from below through our weights.
+    # matmulT uses W virtually transposed — no copy of weights needed.
+    # Result: [N, 1]
+    let delta = matmulT(layer.weights, errorBelow .* dDrive) - layer.error
     layer.state += delta * layer.inferenceRate
+    # TODO: update to in-place version when available (currently allocates several tensors for the intermediate results)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# WEIGHT UPDATE
+# STEP 4 — LEARN (weight update)
+# Hebbian-like rule: weights learn to make this layer's predictions accurate.
+# Assumes state and error are current for this step.
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-func learn*[N, M: static int; T](layer: var PcnDenseLayer[N, M, T], input: Tensor[T, [M, 1]]) =
-    ## Updates weights based on local prediction error.
-    ## dW = learning_rate * (error * input.T)
-    
-    # In standard PCN: Weights learn to minimize the error of the prediction they generated.
-    # We need an outer product: error [N, 1] * input.T [1, M] -> [N, M]
-    
-    # Since we don't have an explicit outer product kernel yet, we can loop:
-    # (Or add a rank-1 update kernel to kernels.nim later for speed)
-    for i in 0..<N:
-        let errVal = layer.error[i, 0] * layer.learningRate
-        for j in 0..<M:
-            # W[i,j] += lr * e[i] * u[j]
-            layer.weights[i, j] += errVal * input[j, 0]
-        
-    # Update biases (input is implicitly 1.0)
-    layer.biases += layer.error * layer.learningRate
+proc learn*[M, N: static int; T; act: Activation[T]](layer: var PcnDenseLayer[M, N, T, act], errorBelow: lent Tensor[T, [M, 1]]) =
+    ## dW = learningRate * errorBelow * state^T   (outer product [M,1] x [1,N] -> [M,N])
+    ## db = learningRate * errorBelow
+    ##
+    ## Rank-1 update computed as a fused loop — no intermediate [M,N] tensor allocated.
+
+    let dDrive = map(layer.drive, func(x: T): T = act.grad(x))
+    let delta = matmulT(errorBelow .* dDrive, layer.state) # [M,N]
+    layer.weights += delta * layer.learningRate
+    # TODO: update to in-place version when available (currently allocates several tensors for the intermediate results)
