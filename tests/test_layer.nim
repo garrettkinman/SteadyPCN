@@ -37,79 +37,87 @@ suite "PcnDenseLayer – Initialization":
         check layer.drive.shape   == [3, 1]
         check layer.error.shape   == [2, 1]
 
-#     test "Bias and state start at zero":
-#         let layer = initPcnLayer[3, 2, float](Identity, lr = 0.01, infRate = 0.1)
-#         for v in layer.bias.data:  check v == 0.0
-#         for v in layer.state.data: check v == 0.0
-#         for v in layer.error.data: check v == 0.0
-#         for v in layer.drive.data: check v == 0.0
+    test "Bias and state start at zero":
+        var layer: PcnDenseLayer[3, 2, float, Identity]
+        layer.init(Identity(), lr = 0.01, infRate = 0.1)
+        for v in layer.bias.data:  check v == 0.0
+        for v in layer.state.data: check v == 0.0
+        for v in layer.error.data: check v == 0.0
+        for v in layer.drive.data: check v == 0.0
 
-#     test "Weights are in initialisation range (-0.1, 0.1)":
-#         let layer = initPcnLayer[4, 4, float](Identity)
-#         for v in layer.weights.data:
-#             check v >= -0.1
-#             check v <=  0.1
+    test "Weights are in initialisation range (-0.1, 0.1)":
+        var layer: PcnDenseLayer[4, 4, float, Identity]
+        layer.init(Identity())
+        for v in layer.weights.data:
+            check v >= -0.1
+            check v <=  0.1
 
-#     test "Learning-rate and inference-rate stored correctly":
-#         let layer = initPcnLayer[2, 2, float](Sigmoid, lr = 0.05, infRate = 0.2)
-#         check layer.learningRate  == 0.05
-#         check layer.inferenceRate == 0.2
+    test "Learning-rate and inference-rate stored correctly":
+        var layer: PcnDenseLayer[2, 2, float, Sigmoid]
+        layer.init(Sigmoid(), lr = 0.05, infRate = 0.2)
+        check layer.learningRate  == 0.05
+        check layer.inferenceRate == 0.2
 
 
-# # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
-# suite "PcnDenseLayer – predict()  (Identity activation)":
-#     # With Identity, predict(layer) = W * state + bias  exactly.
+suite "PcnDenseLayer – predict()  (Identity activation)":
+    # With Identity, predict(layer) = W * state + bias  exactly.
 
-#     test "Zero state → prediction equals bias":
-#         var layer = initPcnLayer[2, 2, float](Identity)
-#         # state is already zero; set bias to something non-trivial
-#         layer.bias[0, 0] = 3.0
-#         layer.bias[1, 0] = -1.0
-#         let pred = layer.predict()
-#         check approxEq(pred[0, 0],  3.0, eps)
-#         check approxEq(pred[1, 0], -1.0, eps)
+    test "Zero state → prediction equals bias":
+        var layer: PcnDenseLayer[2, 2, float, Identity]
+        layer.init(Identity())
+        # state is already zero; set bias to something non-trivial
+        layer.bias[0, 0] = 3.0
+        layer.bias[1, 0] = -1.0
+        let pred = layer.predict()
+        check approxEq(pred[0, 0],  3.0, eps)
+        check approxEq(pred[1, 0], -1.0, eps)
 
-#     test "Non-zero state with known weights":
-#         # W = [[2, 1], [0, 3]]   state = [[1], [2]]   bias = [[0], [0]]
-#         # drive = W * state = [[2*1+1*2], [0*1+3*2]] = [[4], [6]]
-#         var layer = initPcnLayer[2, 2, float](Identity)
-#         layer.weights[0, 0] = 2.0; layer.weights[0, 1] = 1.0
-#         layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 3.0
-#         layer.state[0, 0] = 1.0;   layer.state[1, 0] = 2.0
-#         let pred = layer.predict()
-#         check approxEq(pred[0, 0], 4.0, eps)
-#         check approxEq(pred[1, 0], 6.0, eps)
+    test "Non-zero state with known weights":
+        # W = [[2, 1], [0, 3]]   state = [[1], [2]]   bias = [[0], [0]]
+        # drive = W * state = [[2*1+1*2], [0*1+3*2]] = [[4], [6]]
+        var layer: PcnDenseLayer[2, 2, float, Identity]
+        layer.init(Identity())
+        layer.weights[0, 0] = 2.0; layer.weights[0, 1] = 1.0
+        layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 3.0
+        layer.state[0, 0] = 1.0;   layer.state[1, 0] = 2.0
+        let pred = layer.predict()
+        check approxEq(pred[0, 0], 4.0, eps)
+        check approxEq(pred[1, 0], 6.0, eps)
 
-#     test "Bias is added on top of W*state":
-#         var layer = initPcnLayer[2, 2, float](Identity)
-#         layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
-#         layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0  # identity matrix
-#         layer.state[0, 0] = 5.0;   layer.state[1, 0] = -3.0
-#         layer.bias[0, 0] =  2.0;   layer.bias[1, 0] = 10.0
-#         let pred = layer.predict()
-#         check approxEq(pred[0, 0],  7.0, eps)  # 5 + 2
-#         check approxEq(pred[1, 0],  7.0, eps)  # -3 + 10
+    test "Bias is added on top of W*state":
+        var layer: PcnDenseLayer[2, 2, float, Identity]
+        layer.init(Identity())
+        layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
+        layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0  # identity matrix
+        layer.state[0, 0] = 5.0;   layer.state[1, 0] = -3.0
+        layer.bias[0, 0] =  2.0;   layer.bias[1, 0] = 10.0
+        let pred = layer.predict()
+        check approxEq(pred[0, 0],  7.0, eps)  # 5 + 2
+        check approxEq(pred[1, 0],  7.0, eps)  # -3 + 10
 
-#     test "drive buffer is updated after predict()":
-#         var layer = initPcnLayer[2, 2, float](Identity)
-#         layer.weights[0, 0] = 1.0; layer.weights[1, 1] = 1.0
-#         layer.state[0, 0] = 4.0;   layer.state[1, 0] = -2.0
-#         discard layer.predict()
-#         check approxEq(layer.drive[0, 0],  4.0, eps)
-#         check approxEq(layer.drive[1, 0], -2.0, eps)
+    test "drive buffer is updated after predict()":
+        var layer: PcnDenseLayer[2, 2, float, Identity]
+        layer.init(Identity())
+        layer.weights[0, 0] = 1.0; layer.weights[1, 1] = 1.0
+        layer.state[0, 0] = 4.0;   layer.state[1, 0] = -2.0
+        discard layer.predict()
+        check approxEq(layer.drive[0, 0],  4.0, eps)
+        check approxEq(layer.drive[1, 0], -2.0, eps)
 
-#     test "Rectangular layer (M≠N)":
-#         # M=3, N=2: W is [3,2], state is [2,1], prediction is [3,1]
-#         var layer = initPcnLayer[3, 2, float](Identity)
-#         layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
-#         layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0
-#         layer.weights[2, 0] = 1.0; layer.weights[2, 1] = 1.0
-#         layer.state[0, 0] = 2.0;   layer.state[1, 0] = 3.0
-#         let pred = layer.predict()
-#         check approxEq(pred[0, 0], 2.0, eps)
-#         check approxEq(pred[1, 0], 3.0, eps)
-#         check approxEq(pred[2, 0], 5.0, eps)
+    test "Rectangular layer (M≠N)":
+        # M=3, N=2: W is [3,2], state is [2,1], prediction is [3,1]
+        var layer: PcnDenseLayer[3, 2, float, Identity]
+        layer.init(Identity())
+        layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
+        layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0
+        layer.weights[2, 0] = 1.0; layer.weights[2, 1] = 1.0
+        layer.state[0, 0] = 2.0;   layer.state[1, 0] = 3.0
+        let pred = layer.predict()
+        check approxEq(pred[0, 0], 2.0, eps)
+        check approxEq(pred[1, 0], 3.0, eps)
+        check approxEq(pred[2, 0], 5.0, eps)
 
 
 # suite "PcnDenseLayer – predict()  (non-linear activations)":
