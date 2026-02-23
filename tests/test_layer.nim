@@ -285,13 +285,15 @@ suite "Layer – relax()  (Identity activation)":
 
 suite "Layer – learn()  (Identity activation)":
 
-    test "Weights unchanged when errorBelow is zero":
+    test "Weights and bias unchanged when errorBelow is zero":
         var layer: Layer[2, 2, float, Identity]
         layer.init(Identity(), lr = 0.1)
         let wBefore = layer.weights
+        let bBefore = layer.bias
         var errorBelow = Vector[float, 2].zeros()
         layer.learn(errorBelow)
         check layer.weights == wBefore
+        check layer.bias    == bBefore
 
     test "Weights change when errorBelow is non-zero":
         var layer: Layer[2, 2, float, Identity]
@@ -305,7 +307,46 @@ suite "Layer – learn()  (Identity activation)":
         layer.learn(errorBelow)
         check layer.weights[0, 0] != wBefore00
 
-    test "Larger errorBelow produces larger weight update":
+    test "Bias changes when errorBelow is non-zero":
+        var layer: Layer[2, 2, float, Identity]
+        layer.init(Identity(), lr = 0.1)
+        layer.state[0] = 1.0; layer.state[1] = 1.0
+        discard layer.predict()
+        var errorBelow = Vector[float, 2].zeros()
+        errorBelow[0] = 1.0
+        let bBefore0 = layer.bias[0]
+        layer.learn(errorBelow)
+        check layer.bias[0] != bBefore0
+
+    test "Bias update formula: db = lr * (errorBelow .* grad(drive))":
+        # With Identity, grad = 1 everywhere, so db = lr * errorBelow.
+        # Start from zero bias so the result equals the update exactly.
+        var layer: Layer[2, 2, float, Identity]
+        layer.init(Identity(), lr = 0.25)
+        layer.state[0] = 3.0; layer.state[1] = -1.0
+        discard layer.predict()
+        var errorBelow = Vector[float, 2].zeros()
+        errorBelow[0] = 4.0
+        errorBelow[1] = -2.0
+        layer.learn(errorBelow)
+        # Expected: bias[0] = 0 + 0.25 * 4.0 = 1.0
+        #           bias[1] = 0 + 0.25 * (-2.0) = -0.5
+        check approxEq(layer.bias[0],  1.0, eps)
+        check approxEq(layer.bias[1], -0.5, eps)
+
+    test "Bias accumulates across multiple learn() calls":
+        var layer: Layer[2, 2, float, Identity]
+        layer.init(Identity(), lr = 0.1)
+        layer.state[0] = 1.0; layer.state[1] = 1.0
+        var errorBelow = Vector[float, 2].zeros()
+        errorBelow[0] = 1.0
+        for _ in 0..4:
+            discard layer.predict()
+            layer.learn(errorBelow)
+        # Each call adds lr * 1.0 = 0.1; five calls → 0.5
+        check approxEq(layer.bias[0], 0.5, eps)
+
+    test "Larger errorBelow produces larger weight and bias update":
         var layerBig: Layer[2, 2, float, Identity]
         layerBig.init(Identity(), lr = 0.1)
         var layerSmall: Layer[2, 2, float, Identity]
@@ -329,8 +370,9 @@ suite "Layer – learn()  (Identity activation)":
         layerSmall.learn(errSmall)
 
         check abs(layerBig.weights[0, 0]) > abs(layerSmall.weights[0, 0])
+        check abs(layerBig.bias[0])       > abs(layerSmall.bias[0])
 
-    test "Learning rate scales the weight update":
+    test "Learning rate scales the weight and bias update":
         var layerHighLr: Layer[2, 2, float, Identity]
         layerHighLr.init(Identity(), lr = 0.5)
         var layerLowLr: Layer[2, 2, float, Identity]
@@ -350,6 +392,21 @@ suite "Layer – learn()  (Identity activation)":
         layerLowLr.learn(err)
 
         check abs(layerHighLr.weights[0, 0]) > abs(layerLowLr.weights[0, 0])
+        check abs(layerHighLr.bias[0])       > abs(layerLowLr.bias[0])
+
+    test "Bias-only effect: zero state leaves weights untouched but updates bias":
+        # outer(errorBelow, zero_state) = zero matrix → weights unchanged
+        # but bias still accumulates the errorBelow signal
+        var layer: Layer[2, 2, float, Identity]
+        layer.init(Identity(), lr = 0.2)
+        # state stays at zero (default)
+        discard layer.predict()
+        let wBefore = layer.weights
+        var errorBelow = Vector[float, 2].zeros()
+        errorBelow[0] = 3.0
+        layer.learn(errorBelow)
+        check layer.weights == wBefore           # no state → no weight gradient
+        check approxEq(layer.bias[0], 0.6, eps)  # 0.2 * 3.0
 
 
 # ---------------------------------------------------------------------------
@@ -383,7 +440,7 @@ suite "Layer – End-to-end convergence":
     test "Repeated learn() reduces prediction error on fixed input (Identity)":
         # Supervised-style: drive state to a fixed value, observe prediction,
         # compute errorBelow as (target - prediction), call learn().
-        # Prediction should move toward the target over many steps.
+        # Both weights and bias are updated; prediction should converge to target.
         var layer: Layer[2, 2, float, Identity]
         layer.init(Identity(), lr = 0.05)
         layer.weights[0, 0] = 0.1; layer.weights[1, 1] = 0.1
@@ -410,4 +467,32 @@ suite "Layer – End-to-end convergence":
         let finalErr = abs(target[0] - finalPred[0]) +
                        abs(target[1] - finalPred[1])
         # Error after 50 steps should be smaller than the very first error
+        check finalErr < firstErr
+
+    test "Bias converges toward target offset when state is fixed (Identity)":
+        # With a constant non-zero state and a target that requires a bias shift,
+        # learn() should drive bias toward the required offset.
+        # Concretely: W is zeroed so prediction = bias alone; target = [5, -3].
+        var layer: Layer[2, 2, float, Identity]
+        layer.init(Identity(), lr = 0.1)
+        layer.weights[0, 0] = 0.0; layer.weights[0, 1] = 0.0
+        layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 0.0
+        layer.state[0] = 0.0; layer.state[1] = 0.0
+
+        let target = initVector[float, 2]([5.0, -3.0])
+
+        let initPred = layer.predict()   # = bias = [0, 0]
+        let firstErr = abs(target[0] - initPred[0]) +
+                       abs(target[1] - initPred[1])
+
+        for _ in 0..99:
+            let pred = layer.predict()
+            var err = Vector[float, 2].zeros()
+            err[0] = target[0] - pred[0]
+            err[1] = target[1] - pred[1]
+            layer.learn(err)
+
+        let finalPred = layer.predict()
+        let finalErr = abs(target[0] - finalPred[0]) +
+                       abs(target[1] - finalPred[1])
         check finalErr < firstErr

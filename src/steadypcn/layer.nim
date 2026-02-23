@@ -68,7 +68,7 @@ proc predict*[M, N: static int; T; A](layer: var Layer[M, N, T, A]): Vector[T, M
 proc updateError*[M, N: static int; T; A](layer: var Layer[M, N, T, A], predFromAbove: Vector[T, N]) =
     ## e = state - pred_from_above
     ## Mutates layer.error in-place — no allocation.
-    layer.error = layer.state - predFromAbove  # TODO: update to in-place version when available
+    layer.error = layer.state - predFromAbove
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # STEP 3 — RELAX (state update / inference)
@@ -93,7 +93,6 @@ proc relax*[M, N: static int; T; A](layer: var Layer[M, N, T, A], errorBelow: Ve
     # Result: [N]
     let delta = (layer.weights.t * (errorBelow .* dDrive)) - layer.error
     layer.state += delta * layer.inferenceRate
-    # TODO: update to in-place version when available
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # STEP 4 — LEARN (weight update)
@@ -109,6 +108,11 @@ proc learn*[M, N: static int; T; A](layer: var Layer[M, N, T, A], errorBelow: Ve
     ## beyond the result itself.
 
     let dDrive = grad(layer.activation, layer.drive)
-    let delta  = outer(errorBelow .* dDrive, layer.state)  # [M, N]
-    layer.weights += delta * layer.learningRate
-    # TODO: update to in-place version when available
+
+    # Weight update [M, N]
+    let deltaW = outer(errorBelow .* dDrive, layer.state)
+    layer.weights += deltaW * layer.learningRate
+    
+    # Bias update [M]
+    let deltaB = errorBelow .* dDrive
+    layer.bias += deltaB * layer.learningRate
