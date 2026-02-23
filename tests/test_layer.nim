@@ -20,10 +20,10 @@ func approxEq(a, b, tol: float): bool =
 # Suites
 # ---------------------------------------------------------------------------
 
-suite "PcnDenseLayer – Initialization":
+suite "Layer – Initialization":
 
     test "Default shapes are correct":
-        var layer: PcnDenseLayer[3, 2, float, Identity]
+        var layer: Layer[3, 2, float, Identity]
         layer.init(Identity(), lr = 0.01, infRate = 0.1)
         check layer.weights.rows == 3
         check layer.weights.cols == 2
@@ -33,7 +33,7 @@ suite "PcnDenseLayer – Initialization":
         check layer.error.len   == 2
 
     test "Bias and state start at zero":
-        var layer: PcnDenseLayer[3, 2, float, Identity]
+        var layer: Layer[3, 2, float, Identity]
         layer.init(Identity(), lr = 0.01, infRate = 0.1)
         for v in layer.bias.data:  check v == 0.0
         for v in layer.state.data: check v == 0.0
@@ -41,14 +41,14 @@ suite "PcnDenseLayer – Initialization":
         for v in layer.drive.data: check v == 0.0
 
     test "Weights are in initialisation range (-0.1, 0.1)":
-        var layer: PcnDenseLayer[4, 4, float, Identity]
+        var layer: Layer[4, 4, float, Identity]
         layer.init(Identity())
         for v in layer.weights.data:
             check v >= -0.1
             check v <=  0.1
 
     test "Learning-rate and inference-rate stored correctly":
-        var layer: PcnDenseLayer[2, 2, float, Sigmoid]
+        var layer: Layer[2, 2, float, Sigmoid]
         layer.init(Sigmoid(), lr = 0.05, infRate = 0.2)
         check layer.learningRate  == 0.05
         check layer.inferenceRate == 0.2
@@ -56,11 +56,11 @@ suite "PcnDenseLayer – Initialization":
 
 # ---------------------------------------------------------------------------
 
-suite "PcnDenseLayer – predict()  (Identity activation)":
+suite "Layer – predict()  (Identity activation)":
     # With Identity, predict(layer) = W * state + bias  exactly.
 
     test "Zero state → prediction equals bias":
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity())
         # state is already zero; set bias to something non-trivial
         layer.bias[0] = 3.0
@@ -72,7 +72,7 @@ suite "PcnDenseLayer – predict()  (Identity activation)":
     test "Non-zero state with known weights":
         # W = [[2, 1], [0, 3]]   state = [1, 2]   bias = [0, 0]
         # drive = W * state = [2*1+1*2, 0*1+3*2] = [4, 6]
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity())
         layer.weights[0, 0] = 2.0; layer.weights[0, 1] = 1.0
         layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 3.0
@@ -82,7 +82,7 @@ suite "PcnDenseLayer – predict()  (Identity activation)":
         check approxEq(pred[1], 6.0, eps)
 
     test "Bias is added on top of W*state":
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity())
         layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
         layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0  # identity matrix
@@ -93,7 +93,7 @@ suite "PcnDenseLayer – predict()  (Identity activation)":
         check approxEq(pred[1],  7.0, eps)  # -3 + 10
 
     test "drive buffer is updated after predict()":
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity())
         layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
         layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0
@@ -104,7 +104,7 @@ suite "PcnDenseLayer – predict()  (Identity activation)":
 
     test "Rectangular layer (M≠N)":
         # M=3, N=2: W is [3,2], state is [2], prediction is [3]
-        var layer: PcnDenseLayer[3, 2, float, Identity]
+        var layer: Layer[3, 2, float, Identity]
         layer.init(Identity())
         layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
         layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0
@@ -116,10 +116,10 @@ suite "PcnDenseLayer – predict()  (Identity activation)":
         check approxEq(pred[2], 5.0, eps)
 
 
-suite "PcnDenseLayer – predict()  (non-linear activations)":
+suite "Layer – predict()  (non-linear activations)":
 
     test "Sigmoid: output is strictly in (0, 1)":
-        var layer: PcnDenseLayer[3, 3, float, Sigmoid]
+        var layer: Layer[3, 3, float, Sigmoid]
         layer.init(Sigmoid())
         layer.state[0] = 100.0  # should saturate near 1
         layer.state[1] = -100.0 # should saturate near 0
@@ -134,7 +134,7 @@ suite "PcnDenseLayer – predict()  (non-linear activations)":
         check approxEq(pred[2], 0.5, 1e-4)
 
     test "ReLU: negative drive produces zero output":
-        var layer: PcnDenseLayer[2, 2, float, ReLU]
+        var layer: Layer[2, 2, float, ReLU]
         layer.init(ReLU())
         layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
         layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0
@@ -145,7 +145,7 @@ suite "PcnDenseLayer – predict()  (non-linear activations)":
         check approxEq(pred[1], 0.0, eps)
 
     test "Tanh: zero drive produces zero output":
-        var layer: PcnDenseLayer[2, 2, float, Tanh]
+        var layer: Layer[2, 2, float, Tanh]
         layer.init(Tanh())
         layer.weights[0, 0] = 1.0; layer.weights[1, 1] = 1.0
         # state is zero → drive is zero → tanh(0) = 0
@@ -154,7 +154,7 @@ suite "PcnDenseLayer – predict()  (non-linear activations)":
         check approxEq(pred[1], 0.0, eps)
 
     test "Tanh: output is bounded in (-1, 1)":
-        var layer: PcnDenseLayer[2, 2, float, Tanh]
+        var layer: Layer[2, 2, float, Tanh]
         layer.init(Tanh())
         layer.weights[0, 0] = 1.0; layer.weights[1, 1] = 1.0
         layer.state[0] =  1000.0
@@ -166,10 +166,10 @@ suite "PcnDenseLayer – predict()  (non-linear activations)":
 
 # ---------------------------------------------------------------------------
 
-suite "PcnDenseLayer – updateError()":
+suite "Layer – updateError()":
 
     test "Zero state and zero prediction → zero error":
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity())
         var predAbove = Vector[float, 2].zeros()
         layer.updateError(predAbove)
@@ -177,7 +177,7 @@ suite "PcnDenseLayer – updateError()":
         check approxEq(layer.error[1], 0.0, eps)
 
     test "error = state − predFromAbove":
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity())
         layer.state[0] = 3.0
         layer.state[1] = -1.0
@@ -189,7 +189,7 @@ suite "PcnDenseLayer – updateError()":
         check approxEq(layer.error[1], -3.0, eps)   # -1 - 2
 
     test "When state equals prediction, error is zero":
-        var layer: PcnDenseLayer[3, 3, float, Sigmoid]
+        var layer: Layer[3, 3, float, Sigmoid]
         layer.init(Sigmoid())
         layer.state[0] = 0.5
         layer.state[1] = 1.5
@@ -203,7 +203,7 @@ suite "PcnDenseLayer – updateError()":
             check approxEq(v, 0.0, eps)
 
     test "updateError overwrites any previous error":
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity())
         # First update
         var p1 = Vector[float, 2].zeros()
@@ -220,13 +220,13 @@ suite "PcnDenseLayer – updateError()":
 
 # ---------------------------------------------------------------------------
 
-suite "PcnDenseLayer – relax()  (Identity activation)":
+suite "Layer – relax()  (Identity activation)":
     # With Identity, act.grad = 1 everywhere, so:
     #   delta = W^T * errorBelow - self.error
     #   state += inferenceRate * delta
 
     test "Zero error and zero errorBelow → state unchanged":
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity())
         layer.state[0] = 5.0
         layer.state[1] = -2.0
@@ -238,7 +238,7 @@ suite "PcnDenseLayer – relax()  (Identity activation)":
 
     test "Non-zero errorBelow moves state via W^T feedback":
         # Use identity weight matrix so W^T * errorBelow = errorBelow
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity(), infRate = 1.0)
         layer.weights[0, 0] = 1.0; layer.weights[0, 1] = 0.0
         layer.weights[1, 0] = 0.0; layer.weights[1, 1] = 1.0
@@ -252,9 +252,9 @@ suite "PcnDenseLayer – relax()  (Identity activation)":
         check approxEq(layer.state[1], 0.0, eps)
 
     test "inferenceRate scales the state update":
-        var layerFast: PcnDenseLayer[2, 2, float, Identity]
+        var layerFast: Layer[2, 2, float, Identity]
         layerFast.init(Identity(), infRate = 0.5)
-        var layerSlow: PcnDenseLayer[2, 2, float, Identity]
+        var layerSlow: Layer[2, 2, float, Identity]
         layerSlow.init(Identity(), infRate = 0.1)
         # Identical identity-weight setup
         layerFast.weights[0, 0] = 1.0; layerFast.weights[1, 1] = 1.0
@@ -268,7 +268,7 @@ suite "PcnDenseLayer – relax()  (Identity activation)":
 
     test "Self-error opposes state update":
         # Without errorBelow, delta = -error, state moves toward predFromAbove
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity(), infRate = 1.0)
         layer.state[0] = 3.0
         var predAbove = Vector[float, 2].zeros()
@@ -283,10 +283,10 @@ suite "PcnDenseLayer – relax()  (Identity activation)":
 
 # ---------------------------------------------------------------------------
 
-suite "PcnDenseLayer – learn()  (Identity activation)":
+suite "Layer – learn()  (Identity activation)":
 
     test "Weights unchanged when errorBelow is zero":
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity(), lr = 0.1)
         let wBefore = layer.weights
         var errorBelow = Vector[float, 2].zeros()
@@ -294,7 +294,7 @@ suite "PcnDenseLayer – learn()  (Identity activation)":
         check layer.weights == wBefore
 
     test "Weights change when errorBelow is non-zero":
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity(), lr = 0.1)
         # Drive must be set (predict() populates drive; Identity grad = 1 always)
         layer.state[0] = 1.0; layer.state[1] = 1.0
@@ -306,9 +306,9 @@ suite "PcnDenseLayer – learn()  (Identity activation)":
         check layer.weights[0, 0] != wBefore00
 
     test "Larger errorBelow produces larger weight update":
-        var layerBig: PcnDenseLayer[2, 2, float, Identity]
+        var layerBig: Layer[2, 2, float, Identity]
         layerBig.init(Identity(), lr = 0.1)
-        var layerSmall: PcnDenseLayer[2, 2, float, Identity]
+        var layerSmall: Layer[2, 2, float, Identity]
         layerSmall.init(Identity(), lr = 0.1)
         # Override to known zero weights
         layerBig.weights[0, 0] = 0.0; layerBig.weights[0, 1] = 0.0
@@ -331,9 +331,9 @@ suite "PcnDenseLayer – learn()  (Identity activation)":
         check abs(layerBig.weights[0, 0]) > abs(layerSmall.weights[0, 0])
 
     test "Learning rate scales the weight update":
-        var layerHighLr: PcnDenseLayer[2, 2, float, Identity]
+        var layerHighLr: Layer[2, 2, float, Identity]
         layerHighLr.init(Identity(), lr = 0.5)
-        var layerLowLr: PcnDenseLayer[2, 2, float, Identity]
+        var layerLowLr: Layer[2, 2, float, Identity]
         layerLowLr.init(Identity(), lr = 0.01)
         # Override to known zero weights
         for w in [layerHighLr.weights.addr, layerLowLr.weights.addr]:
@@ -354,12 +354,12 @@ suite "PcnDenseLayer – learn()  (Identity activation)":
 
 # ---------------------------------------------------------------------------
 
-suite "PcnDenseLayer – End-to-end convergence":
+suite "Layer – End-to-end convergence":
 
     test "Repeated relax() reduces self-error magnitude (Identity)":
         # Layer with identity weights; predFromAbove is constant.
         # Repeated relax() should drive state toward predFromAbove, reducing error.
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity(), infRate = 0.3)
         layer.weights[0, 0] = 1.0; layer.weights[1, 1] = 1.0
         layer.state[0] = 4.0; layer.state[1] = -2.0
@@ -384,7 +384,7 @@ suite "PcnDenseLayer – End-to-end convergence":
         # Supervised-style: drive state to a fixed value, observe prediction,
         # compute errorBelow as (target - prediction), call learn().
         # Prediction should move toward the target over many steps.
-        var layer: PcnDenseLayer[2, 2, float, Identity]
+        var layer: Layer[2, 2, float, Identity]
         layer.init(Identity(), lr = 0.05)
         layer.weights[0, 0] = 0.1; layer.weights[1, 1] = 0.1
         layer.state[0] = 1.0;   layer.state[1] = 1.0

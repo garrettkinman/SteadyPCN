@@ -3,5 +3,5 @@
 # This software is released under the MIT License.
 # https://opensource.org/licenses/MIT
 
-import steadypcn / [activations, tensors, ops, kernels, pcn]
-export activations, tensors, ops, kernels, pcn
+import steadypcn / [activations, tensors, ops, kernels, layer]
+export activations, tensors, ops, kernels, layer

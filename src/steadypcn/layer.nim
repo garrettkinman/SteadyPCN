@@ -9,7 +9,7 @@ import tensors, ops, activations
 type
     # A Dense Predictive Coding Layer
     # Explanations: N, Observations: M
-    PcnDenseLayer*[M, N: static int; T; A] = object
+    Layer*[M, N: static int; T; A] = object
         # Parameters
         weights*: Matrix[T, M, N]   # Maps this layer's state [N] to prediction [M]
         bias*:    Vector[T, M]      # Added to pre-activation; shape matches prediction, not state
@@ -31,7 +31,7 @@ type
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 proc init*[M, N: static int; T; A](
-    layer: var PcnDenseLayer[M, N, T, A],
+    layer: var Layer[M, N, T, A],
     activation: sink A,
     lr: T = 0.01,
     infRate: T = 0.1
@@ -53,7 +53,7 @@ proc init*[M, N: static int; T; A](
 # layer below's updateError.
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-proc predict*[M, N: static int; T; A](layer: var PcnDenseLayer[M, N, T, A]): Vector[T, M] =
+proc predict*[M, N: static int; T; A](layer: var Layer[M, N, T, A]): Vector[T, M] =
     ## pred = activate(act, W * state + bias)
     ## Returns [M] — the prediction sent downward.
     layer.drive = (layer.weights * layer.state) + layer.bias
@@ -65,7 +65,7 @@ proc predict*[M, N: static int; T; A](layer: var PcnDenseLayer[M, N, T, A]): Vec
 # Call after the layer above has called predict().
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-proc updateError*[M, N: static int; T; A](layer: var PcnDenseLayer[M, N, T, A], predFromAbove: Vector[T, N]) =
+proc updateError*[M, N: static int; T; A](layer: var Layer[M, N, T, A], predFromAbove: Vector[T, N]) =
     ## e = state - pred_from_above
     ## Mutates layer.error in-place — no allocation.
     layer.error = layer.state - predFromAbove  # TODO: update to in-place version when available
@@ -77,7 +77,7 @@ proc updateError*[M, N: static int; T; A](layer: var PcnDenseLayer[M, N, T, A], 
 # Assumes updateError has already been called this step.
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-proc relax*[M, N: static int; T; A](layer: var PcnDenseLayer[M, N, T, A], errorBelow: Vector[T, M]) =
+proc relax*[M, N: static int; T; A](layer: var Layer[M, N, T, A], errorBelow: Vector[T, M]) =
     ## dx = inferenceRate * ((W^T * errorBelow) .* act.grad(layer.drive) - layer.error)
     ##
     ## Two small stack vectors are allocated (dDrive [M], delta [N]);
@@ -101,7 +101,7 @@ proc relax*[M, N: static int; T; A](layer: var PcnDenseLayer[M, N, T, A], errorB
 # Assumes state and error are current for this step.
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-proc learn*[M, N: static int; T; A](layer: var PcnDenseLayer[M, N, T, A], errorBelow: Vector[T, M]) =
+proc learn*[M, N: static int; T; A](layer: var Layer[M, N, T, A], errorBelow: Vector[T, M]) =
     ## dW = learningRate * (errorBelow .* act.grad(drive)) ⊗ state   (outer product [M] x [N] -> [M,N])
     ## db = learningRate * errorBelow   (bias update omitted; see note below)
     ##
