@@ -15,4 +15,3 @@ srcDir        = "src"
 # Dependencies
 
 requires "nim >= 2.2.0"
-requires "steadytensor >= 0.1.0"
